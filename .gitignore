@@ -1,2 +1,3 @@
 data/_*.txt
 __pycache__/
+data/foods-raw.json
