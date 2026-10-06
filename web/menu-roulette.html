@@ -1,0 +1,389 @@
+<title>오늘 뭐 먹지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap">
+<style>
+  :root {
+    --ground: #eef1ef;      /* 스테인리스 식판 */
+    --panel: #ffffff;
+    --ink: #1e2a27;
+    --ink-soft: #5b6764;
+    --line: #d5dcd9;
+    --chili: #d2442e;       /* 고추 — 포인터·버튼 */
+    --chili-ink: #ffffff;
+    --yolk: #f2b33d;        /* 노른자 — 결과 */
+    --yolk-soft: #fdf1d6;
+    --focus: #1f6fd1;
+    --display: "Black Han Sans", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #161c1b; --panel: #1f2725; --ink: #e8eeec; --ink-soft: #9fb0ab; --line: #33403d;
+      --chili: #f0644b; --chili-ink: #1a0d0a; --yolk: #f5c15a; --yolk-soft: #3a3020; --focus: #7fb2ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #161c1b; --panel: #1f2725; --ink: #e8eeec; --ink-soft: #9fb0ab; --line: #33403d;
+    --chili: #f0644b; --chili-ink: #1a0d0a; --yolk: #f5c15a; --yolk-soft: #3a3020; --focus: #7fb2ff;
+  }
+
+  html, body { background: var(--ground); }
+  body { color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+  .page { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 40px; display: grid; gap: 18px; }
+
+  header h1 { font-family: var(--display); font-weight: 400; font-size: clamp(34px, 9vw, 48px); line-height: 1.05; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  header p { margin: 6px 0 0; color: var(--ink-soft); }
+
+  /* 음식 종류 필터 */
+  .filter { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .filter-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 12px; }
+  .filter-head:disabled { cursor: not-allowed; opacity: .6; }
+  .filter-head .chev { transition: transform .2s; color: var(--ink-soft); }
+  .filter-head[aria-expanded="true"] .chev { transform: rotate(90deg); }
+  .filter-head .label { font-size: 12px; letter-spacing: .06em; color: var(--ink-soft); }
+  .filter-head .summary { font-weight: 600; }
+  .filter-body { padding: 0 14px 14px; display: grid; gap: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+  .chip .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  .chip:disabled { opacity: .5; cursor: not-allowed; }
+  .chip .count { font-weight: 400; font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums; }
+  .bulk { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .link-btn { background: none; border: 0; padding: 4px 2px; color: var(--ink-soft); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+  .link-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .note { font-size: 13px; color: var(--ink-soft); margin: 0; }
+
+  /* 원판 */
+  .wheel-area { display: grid; justify-items: center; gap: 14px; }
+  .wheel-wrap { position: relative; width: min(100%, 480px); aspect-ratio: 1; max-width: 100%; }
+  .pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 0; height: 0; z-index: 2;
+    border-left: 16px solid transparent; border-right: 16px solid transparent; border-top: 28px solid var(--chili);
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.25)); }
+  #wheel { width: 100%; height: 100%; display: block; border-radius: 50%; box-shadow: 0 0 0 8px var(--panel), 0 0 0 9px var(--line), 0 10px 30px rgba(0,0,0,.12);
+    transform: rotate(0deg); will-change: transform; }
+  #wheel.spinning { transition: transform 4.4s cubic-bezier(0.12, 0.7, 0.12, 1); }
+  .hub { position: absolute; inset: 0; margin: auto; width: 18%; aspect-ratio: 1; border-radius: 50%; background: var(--panel); border: 3px solid var(--ink);
+    display: grid; place-items: center; font-family: var(--display); font-size: clamp(13px, 3.4vw, 18px); color: var(--ink); z-index: 1; pointer-events: none; }
+
+  .spin { font-family: var(--display); font-weight: 400; font-size: 22px; padding: 12px 40px; border-radius: 999px; border: 0; background: var(--chili); color: var(--chili-ink); cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+  .spin:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+  .spin:disabled { opacity: .55; cursor: not-allowed; }
+  .pool-line { font-size: 13px; color: var(--ink-soft); margin: 0; text-align: center; }
+
+  /* 결과 팝업 */
+  dialog.result { background: var(--yolk-soft); color: var(--ink); border: 2px solid var(--yolk); border-radius: 18px; padding: 22px 22px 18px; width: min(360px, calc(100% - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  dialog.result::backdrop { background: rgba(20, 28, 26, .55); }
+  dialog.result .inner { display: grid; gap: 10px; justify-items: center; text-align: center; }
+  dialog.result .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+  .ghost { font: inherit; font-weight: 600; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  dialog.result .spin { font-size: 18px; padding: 10px 24px; }
+  .result .eyebrow { font-size: 12px; letter-spacing: .08em; color: var(--ink-soft); }
+  .result .menu { font-family: var(--display); font-size: clamp(36px, 11vw, 56px); line-height: 1.1; margin: 0; text-wrap: balance; }
+  .result .cat { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+  .result .cat .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+  .result a { color: var(--ink); font-weight: 600; }
+  dialog.result[open] { animation: pop .35s ease-out; }
+  @keyframes pop { from { transform: scale(.94); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+
+  .history { font-size: 13px; color: var(--ink-soft); margin: 0; text-align: center; }
+
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    #wheel.spinning { transition-duration: .8s; }
+    dialog.result[open] { animation: none; }
+    .filter-head .chev { transition: none; }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <h1>오늘 뭐 먹지?</h1>
+    <p>먹고 싶은 종류만 골라 두고 원판을 돌리세요. 멈춘 칸 종류의 모든 메뉴 중에서 하나를 뽑아 드립니다.</p>
+  </header>
+
+  <section class="filter" aria-label="음식 종류">
+    <button class="filter-head" id="filter-toggle" type="button" aria-expanded="true" aria-controls="filter-body">
+      <span class="chev" aria-hidden="true">▶</span>
+      <span class="label">음식 종류</span>
+      <span class="summary" id="filter-summary"></span>
+    </button>
+    <div class="filter-body" id="filter-body">
+      <div class="chips" id="chips" role="group" aria-label="음식 종류 선택"></div>
+      <div class="bulk">
+        <button class="link-btn" id="select-all" type="button">전체 선택</button>
+        <button class="link-btn" id="select-none" type="button">전체 해제</button>
+      </div>
+      <p class="note" id="filter-note" hidden>아무 종류도 고르지 않아 전체 메뉴에서 돌립니다.</p>
+    </div>
+  </section>
+
+  <section class="wheel-area" aria-label="메뉴 원판">
+    <div class="wheel-wrap">
+      <div class="pointer" aria-hidden="true"></div>
+      <canvas id="wheel" role="img" aria-label="메뉴 원판"></canvas>
+      <div class="hub" aria-hidden="true">GO</div>
+    </div>
+    <p class="pool-line" id="pool-line"></p>
+    <button class="spin" id="spin" type="button">돌리기</button>
+  </section>
+
+  <dialog class="result" id="result" aria-labelledby="result-menu">
+    <div class="inner">
+      <span class="eyebrow">오늘의 메뉴</span>
+      <p class="menu" id="result-menu"></p>
+      <span class="cat" id="result-cat"><span class="dot"></span><span></span></span>
+      <a id="result-map" href="#" target="_blank" rel="noreferrer">근처 식당 찾기 (네이버 지도) ↗</a>
+      <div class="actions">
+        <button class="spin" id="again" type="button">다시 돌리기</button>
+        <button class="ghost" id="close" type="button">닫기</button>
+      </div>
+    </div>
+  </dialog>
+  <p class="history" id="history" hidden></p>
+</div>
+
+<script>
+(() => {
+  // 음식 종류 — 색은 그 종류를 떠올리게 하는 재료에서: 김치·간장·미역·토마토·단무지·감자튀김·고수
+  const CATEGORIES = [
+    { name: "한식", color: "#c9513c" },
+    { name: "중식", color: "#7a4e2d" },
+    { name: "일식", color: "#2f6e5c" },
+    { name: "양식", color: "#d97a3a" },
+    { name: "분식", color: "#e8c547" },
+    { name: "패스트푸드", color: "#b9853f" },
+    { name: "아시안", color: "#6f9a4c" },
+  ];
+  const MENUS = {
+    "한식": ["김치찌개", "된장찌개", "순두부찌개", "제육볶음", "비빔밥", "불고기 백반", "갈비탕", "냉면", "감자탕", "삼겹살", "닭갈비", "부대찌개", "갈비찜", "곰탕", "국밥", "꽃게탕", "낙지볶음", "내장탕", "닭곰탕", "닭볶음탕", "도가니탕", "동태찌개", "돼지갈비", "떡갈비", "떡국", "떡만두국", "만두국", "매운탕", "물회", "삼계탕", "설렁탕", "불고기", "수육", "순댓국", "아귀찜", "알탕", "돌솥비빔밥", "오리불고기", "오리백숙", "오징어볶음", "육개장", "장어구이", "족발", "청국장", "추어탕", "콩국수", "콩비지찌개", "해장국", "회덮밥", "곱창", "고등어구이 정식", "해물파전", "전복죽", "팥죽", "김치볶음밥", "콩나물국밥", "소고기찜"],
+    "중식": ["짜장면", "짬뽕", "탕수육", "마파두부밥", "볶음밥", "잡채밥", "깐풍기", "마라탕", "간짜장", "짬뽕밥", "짜장밥", "양장피", "유산슬밥", "팔보채", "멘보샤"],
+    "일식": ["초밥", "돈카츠", "라멘", "우동", "규동", "가츠동", "오코노미야키", "소바", "데리야키 치킨덮밥", "하이라이스", "샤브샤브", "알밥"],
+    "양식": ["파스타", "피자", "리조또", "스테이크", "함박스테이크", "오므라이스", "샐러드", "미트소스 스파게티", "오븐스파게티", "그라탕"],
+    "분식": ["떡볶이", "김밥", "라볶이", "순대", "쫄면", "칼국수", "수제비", "만두", "라면", "주먹밥", "볶음우동"],
+    "패스트푸드": ["햄버거", "치킨", "핫도그", "샌드위치", "타코", "피시앤칩스", "토스트"],
+    "아시안": ["쌀국수", "팟타이", "분짜", "나시고렝", "카레", "반미", "똠얌꿍", "월남쌈"],
+  };
+  const MIN_SLICES = 8;             // 고른 종류가 적으면 칸을 반복해 원판이 휑하지 않게
+  const SPIN_TURNS = 6;             // 멈추기 전 최소 바퀴 수
+  const STORE_KEY = "menu-roulette:v1";
+
+  const colorOf = Object.fromEntries(CATEGORIES.map((c) => [c.name, c.color]));
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    toggle: $("filter-toggle"), body: $("filter-body"), summary: $("filter-summary"), chips: $("chips"),
+    all: $("select-all"), none: $("select-none"), note: $("filter-note"),
+    canvas: $("wheel"), spin: $("spin"), poolLine: $("pool-line"),
+    result: $("result"), resultMenu: $("result-menu"), resultCat: $("result-cat"), resultMap: $("result-map"), history: $("history"),
+    again: $("again"), close: $("close"),
+  };
+
+  // ---- 상태 ----
+  let selected = new Set(CATEGORIES.map((c) => c.name));
+  let slices = [];          // 원판 칸 = 음식 종류 [{category}] (메뉴는 칸에 올리지 않는다 — 가짓수가 줄지 않게)
+  let rotation = 0;         // 지금까지 돈 누적 각도(도). 계속 앞으로만 돈다
+  let spinning = false;
+  let recent = [];
+
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch { return null; } };
+  const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify({ selected: [...selected], collapsed: els.toggle.getAttribute("aria-expanded") === "false", recent })); } catch { /* 저장 못 해도 동작은 같다 */ } };
+  const saved = load();
+  if (saved && Array.isArray(saved.selected)) selected = new Set(saved.selected.filter((n) => colorOf[n]));
+  if (saved && Array.isArray(saved.recent)) recent = saved.recent.filter((r) => typeof r === "string").slice(0, 5);
+
+  const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  /** 선택한 종류의 메뉴. 아무것도 안 골랐으면 전체. */
+  function pool() {
+    const cats = selected.size ? CATEGORIES.filter((c) => selected.has(c.name)) : CATEGORIES;
+    return cats.flatMap((c) => MENUS[c.name].map((name) => ({ name, category: c.name })));
+  }
+
+  /** 원판 칸: 고른 종류를 차례로, 칸이 MIN_SLICES보다 적으면 반복한다. */
+  function rebuildSlices() {
+    const cats = selected.size ? CATEGORIES.filter((c) => selected.has(c.name)) : CATEGORIES;
+    const rounds = Math.max(1, Math.ceil(MIN_SLICES / cats.length));
+    slices = Array.from({ length: rounds }, () => cats.map((c) => ({ category: c.name }))).flat();
+    els.poolLine.textContent = `메뉴 ${pool().length}개 중에서 하나를 뽑아요`;
+    els.note.hidden = selected.size > 0;
+    drawWheel();
+  }
+
+  // ---- 원판 그리기 (Canvas) ----
+  function drawWheel() {
+    const canvas = els.canvas;
+    const size = canvas.clientWidth || 360;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const r = size / 2;
+    const n = slices.length;
+    const step = (Math.PI * 2) / n;
+    const css = getComputedStyle(document.documentElement);
+    const panel = css.getPropertyValue("--panel").trim() || "#fff";
+    ctx.clearRect(0, 0, size, size);
+    ctx.translate(r, r);
+    // 칸 i는 꼭대기(포인터)에서 시계 방향으로 [i*step, (i+1)*step]
+    for (let i = 0; i < n; i++) {
+      const start = -Math.PI / 2 + i * step;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, start, start + step);
+      ctx.closePath();
+      ctx.fillStyle = colorOf[slices[i].category];
+      ctx.fill();
+      // 한 종류만 골라 같은 색이 이어지면 한 칸 걸러 살짝 밝게
+      if (i % 2 === 1 && slices[i - 1].category === slices[i].category) { ctx.fillStyle = "rgba(255,255,255,.2)"; ctx.fill(); }
+      ctx.strokeStyle = panel;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    // 글씨: 칸 가운데를 따라 바깥쪽에서 안쪽으로
+    const fontSize = Math.max(12, Math.min(22, size / (n > 12 ? 22 : 18)));
+    ctx.font = `700 ${fontSize}px ${getComputedStyle(document.body).fontFamily}`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i < n; i++) {
+      const mid = -Math.PI / 2 + (i + 0.5) * step;
+      ctx.save();
+      ctx.rotate(mid);
+      const light = ["분식", "양식", "패스트푸드"].includes(slices[i].category);
+      ctx.fillStyle = light ? "#1e2a27" : "#ffffff";
+      let label = slices[i].category;
+      const maxW = r * 0.62;
+      while (ctx.measureText(label).width > maxW && label.length > 2) label = label.slice(0, -2) + "…";
+      ctx.fillText(label, r - 14, 0);
+      ctx.restore();
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    els.canvas.setAttribute("aria-label", `음식 종류 원판: ${[...new Set(slices.map((s) => s.category))].join(", ")}`);
+  }
+
+  // ---- 필터 ----
+  function renderChips() {
+    els.chips.innerHTML = "";
+    for (const c of CATEGORIES) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.id = `chip-${c.name}`;
+      b.style.setProperty("--c", c.color);
+      b.setAttribute("aria-pressed", String(selected.has(c.name)));
+      b.innerHTML = `<span class="dot" aria-hidden="true"></span>${c.name}<span class="count">${MENUS[c.name].length}</span>`;
+      b.addEventListener("click", () => {
+        if (spinning) return;
+        selected.has(c.name) ? selected.delete(c.name) : selected.add(c.name);
+        onFilterChange();
+      });
+      els.chips.appendChild(b);
+    }
+  }
+  function renderSummary() {
+    const names = CATEGORIES.map((c) => c.name).filter((n) => selected.has(n));
+    els.summary.textContent = !names.length || names.length === CATEGORIES.length ? "전체"
+      : names.length <= 2 ? names.join(", ") : `${names.slice(0, 2).join(", ")} 외 ${names.length - 2}개`;
+  }
+  function onFilterChange() {
+    for (const b of els.chips.children) b.setAttribute("aria-pressed", String(selected.has(b.id.slice(5))));
+    renderSummary();
+    rebuildSlices();
+    save();
+  }
+  els.toggle.addEventListener("click", () => {
+    const open = els.toggle.getAttribute("aria-expanded") !== "true";
+    els.toggle.setAttribute("aria-expanded", String(open));
+    els.body.hidden = !open;
+    save();
+  });
+  els.all.addEventListener("click", () => { if (spinning) return; selected = new Set(CATEGORIES.map((c) => c.name)); onFilterChange(); });
+  els.none.addEventListener("click", () => { if (spinning) return; selected = new Set(); onFilterChange(); });
+
+  function setBusy(busy) {
+    spinning = busy;
+    els.spin.disabled = busy;
+    els.toggle.disabled = busy;
+    els.all.disabled = busy; els.none.disabled = busy;
+    for (const b of els.chips.children) b.disabled = busy;
+  }
+
+  // ---- 돌리기: 멈출 칸을 먼저 정하고 그 칸에 멈추도록 각도를 계산한다. 메뉴는 그 칸 종류의 전체 메뉴에서 ----
+  function spin() {
+    if (spinning || !slices.length) return;
+    closePopup();
+    // 칸을 먼저 고르고, 그 칸 종류의 메뉴 중에서 뽑는다 — 칸 크기만큼 그 종류가 나온다(한식 메뉴가 많아도 한식만 몰리지 않게)
+    const target = Math.floor(Math.random() * slices.length);
+    const category = slices[target].category;
+    const choices = MENUS[category];
+    const pick = { name: choices[Math.floor(Math.random() * choices.length)], category };
+    const n = slices.length;
+    const step = 360 / n;
+    const offset = (Math.random() - 0.5) * step * 0.7;              // 칸 안쪽 어딘가 — 경계에는 멈추지 않게
+    const targetAngle = target * step + step / 2 + offset;          // 원판 기준, 꼭대기에서 시계 방향
+    // 원판을 R도 돌리면 꼭대기 포인터는 원판의 (-R mod 360)을 가리킨다 → -R ≡ targetAngle
+    const current = ((rotation % 360) + 360) % 360;
+    const needed = ((360 - targetAngle - current) % 360 + 360) % 360;
+    rotation += SPIN_TURNS * 360 + needed;
+
+    setBusy(true);
+    els.canvas.classList.add("spinning");
+    els.canvas.style.transform = `rotate(${rotation}deg)`;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      els.canvas.removeEventListener("transitionend", finish);
+      setBusy(false);
+      showResult(pick);
+    };
+    els.canvas.addEventListener("transitionend", finish);
+    const ms = parseFloat(getComputedStyle(els.canvas).transitionDuration) * 1000 || 4400;
+    setTimeout(finish, ms + 300);                                   // transitionend가 안 와도 끝낸다
+  }
+
+  function closePopup() {
+    if (els.result.open) { try { els.result.close(); } catch { els.result.removeAttribute("open"); } }
+  }
+
+  function showResult(item) {
+    els.resultMenu.textContent = item.name;
+    els.resultCat.style.setProperty("--c", colorOf[item.category]);
+    els.resultCat.lastElementChild.textContent = item.category;
+    els.resultMap.href = `https://map.naver.com/p/search/${encodeURIComponent(item.name)}`;
+    try { els.result.showModal(); } catch { els.result.setAttribute("open", ""); }
+    els.again.focus();
+    recent = [item.name, ...recent.filter((r) => r !== item.name)].slice(0, 5);
+    renderHistory();
+    els.spin.textContent = "다시 돌리기";
+    save();
+  }
+  function renderHistory() {
+    els.history.hidden = recent.length < 2;
+    els.history.textContent = `최근 결과: ${recent.join(" · ")}`;
+  }
+
+  els.spin.addEventListener("click", spin);
+  els.again.addEventListener("click", spin);
+  els.close.addEventListener("click", closePopup);
+  // 팝업 바깥(어두운 부분)을 누르면 닫는다
+  els.result.addEventListener("click", (e) => { if (e.target === els.result) closePopup(); });
+  let resizeTimer;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(drawWheel, 120); });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", drawWheel);
+  new MutationObserver(drawWheel).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---- 시작 ----
+  if (saved && saved.collapsed) { els.toggle.setAttribute("aria-expanded", "false"); els.body.hidden = true; }
+  renderChips();
+  renderSummary();
+  renderHistory();
+  rebuildSlices();
+  // 한글 글꼴이 늦게 오면 원판 글씨를 다시 그린다
+  if (document.fonts?.load) document.fonts.load('700 16px "IBM Plex Sans KR"', "김치찌개").then(drawWheel).catch(() => {});
+})();
+</script>
